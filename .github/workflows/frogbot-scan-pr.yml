@@ -1,0 +1,39 @@
+name: Frogbot Scan Pull Request
+
+on:
+  pull_request_target:
+    branches:
+      - master
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+  pull-requests: write # required for Frogbot to comment on the PR
+  security-events: write
+
+jobs:
+  scan-pull-request:
+    runs-on: ubuntu-latest
+    environment: frogbot
+    env:
+      JF_URL: ${{ secrets.JF_URL }}
+      JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+      JF_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Frogbot Scan PR
+        uses: jfrog/frogbot@v2
+        env:
+          JF_URL: ${{ env.JF_URL }}
+          JF_ACCESS_TOKEN: ${{ env.JF_ACCESS_TOKEN }}
+          JF_GIT_TOKEN: ${{ env.JF_GIT_TOKEN }}
+          JF_GIT_PROVIDER: github
+          JF_GIT_OWNER: asafsofer-sl
+          JF_GIT_REPO: NodeGoat

@@ -1,0 +1,73 @@
+name: Build and Publish to Artifactory
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # required for OIDC token request
+  contents: read
+
+env:
+  JF_URL: ${{ secrets.JF_URL }}
+  BUILD_NAME: nodegoat-ci
+  BUILD_NUMBER: ${{ github.run_number }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup JFrog CLI (Access Token)
+        uses: jfrog/setup-jfrog-cli@v4
+        id: setup-jfrog-cli
+        env:
+          JF_URL: ${{ env.JF_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+
+      - name: Configure npm repos in Artifactory
+        run: |
+          jf npm-config \
+            --repo-resolve=npm-remote-frogbot \
+            --repo-deploy=npm-local-frogbot
+
+      - name: Install dependencies (via Artifactory)
+        run: jf npm install
+
+      - name: Run build/lint tasks (if any)
+        run: |
+          if npm run | grep -q " build"; then
+            npm run build
+          else
+            echo "No 'build' script defined in package.json, skipping."
+          fi
+
+      - name: Publish package to Artifactory
+        run: jf npm publish
+
+      - name: Publish build info
+        run: |
+          jf rt build-collect-env "$BUILD_NAME" "$BUILD_NUMBER"
+          jf rt build-add-git "$BUILD_NAME" "$BUILD_NUMBER"
+          jf rt build-publish "$BUILD_NAME" "$BUILD_NUMBER"
+
+      - name: Xray build scan
+        run: jf build-scan "$BUILD_NAME" "$BUILD_NUMBER"
+
+      - name: Confirm build result
+        run: |
+          echo "Build name: $BUILD_NAME"
+          echo "Build number: $BUILD_NUMBER"
+          echo "Build published to Artifactory at: $JF_URL"
+          echo "Check build details at: $JF_URL/ui/builds/$BUILD_NAME/$BUILD_NUMBER"
