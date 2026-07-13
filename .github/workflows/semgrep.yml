@@ -47,3 +47,11 @@ jobs:
         with:
           sarif_file: semgrep.sarif
         if: always()
+
+      # Archive and expose the raw SARIF file as a downloadable artifact
+      - name: Save raw SARIF report
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-raw-report
+          path: semgrep.sarif
+        if: always()
