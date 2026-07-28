@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - master
+      - feature/demo-lab
 
   pull_request:
     branches:
       - master
+      - feature/demo-lab
 
 
 env:
