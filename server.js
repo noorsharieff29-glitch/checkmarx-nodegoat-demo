@@ -12,7 +12,12 @@ const MongoClient = require("mongodb").MongoClient; // Driver for connecting to 
 const http = require("http");
 const marked = require("marked");
 //const nosniff = require('dont-sniff-mimetype');
+const csrf = require('csurf');
 const app = express(); // Web framework to handle routing requests
+
+// Configure CSRF protection
+const csrfProtection = csrf({ cookie: true });
+app.use(csrfProtection);
 const routes = require("./app/routes");
 const { port, db, cookieSecret } = require("./config/config"); // Application config properties
 /*
@@ -76,82 +81,168 @@ MongoClient.connect(db, (err, db) => {
 
     // Enable session management using express middleware
     app.use(session({
+        name: 'sessionId',
         // genid: (req) => {
-        //    return genuuid() // use UUIDs for session IDs
-        //},
-        secret: cookieSecret,
-        // Both mandatory in Express v4
-        saveUninitialized: true,
-        resave: true
-        /*
-        // Fix for A5 - Security MisConfig
-        // Use generic cookie name
-        key: "sessionId",
-        */
+        app.use(session({
+                cookie: {
+                    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+                    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+                    httpOnly: true // Prevent XSS attacks
+                },
+                // genid: (req) => {
+                app.use(session({
+                        cookie: {
+                            secure: process.env.NODE_ENV === 'production',
+                            httpOnly: true,
+                            maxAge: 24 * 60 * 60 * 1000 // 24 hours
+                        },
+                        // genid: (req) => {
+                        app.use(session({
+                                cookie: {
+                                    domain: '.yourdomain.com',
+                                    secure: true,
+                                    httpOnly: true
+                                },
+                                // genid: (req) => {
+                                app.use(session({
+                                        cookie: {
+                                            httpOnly: true,
+                                            secure: process.env.NODE_ENV === 'production',
+                                            maxAge: 24 * 60 * 60 * 1000 // 24 hours
+                                        },
+                                        // genid: (req) => {
+                                        app.use(session({
+                                                cookie: {
+                                                    path: '/',
+                                                    secure: process.env.NODE_ENV === 'production',
+                                                    httpOnly: true,
+                                                    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+                                                },
+                                                // genid: (req) => {
+                                                //    return genuuid() // use UUIDs for session IDs
 
         /*
         // Fix for A3 - XSS
         // TODO: Add "maxAge"
         cookie: {
             httpOnly: true
-            // Remember to start an HTTPS server to get this working
-            // secure: true
-        }
-        */
+            app.use(session({
+                    // genid: (req) => {
+                    //    return genuuid() // use UUIDs for session IDs
+                    //},
+                    secret: cookieSecret,
+                    // Both mandatory in Express v4
+                    saveUninitialized: true,
+                    resave: true,
+                    /*
+                    // Fix for A5 - Security MisConfig
+                    // Use generic cookie name
+                    key: "sessionId",
+                    */
 
-    }));
+                    /*
+                    // Fix for A3 - XSS
+                    // TODO: Add "maxAge"
+                    */
+                    cookie: {
+                        httpOnly: true,
+                        path: '/'
+                        app.use(session({
+                                // genid: (req) => {
+                                //    return genuuid() // use UUIDs for session IDs
+                                //},
+                                secret: cookieSecret,
+                                // Both mandatory in Express v4
+                                saveUninitialized: true,
+                                resave: true,
+                                /*
+                                // Fix for A5 - Security MisConfig
+                                // Use generic cookie name
+                                key: "sessionId",
+                                */
 
-    /*
-    // Fix for A8 - CSRF
-    // Enable Express csrf protection
-    app.use(csrf());
-    // Make csrf token available in templates
-    app.use((req, res, next) => {
-        res.locals.csrftoken = req.csrfToken();
-        next();
-    });
-    */
+                                /*
+                                // Fix for A3 - XSS
+                                // TODO: Add "maxAge"
+                                */
+                                cookie: {
+                                    httpOnly: true,
+                                    domain: process.env.COOKIE_DOMAIN || 'localhost'
+                                    app.use(session({
+                                            // genid: (req) => {
+                                            //    return genuuid() // use UUIDs for session IDs
+                                            //},
+                                            secret: cookieSecret,
+                                            // Both mandatory in Express v4
+                                            saveUninitialized: true,
+                                            resave: true,
+                                            /*
+                                            // Fix for A5 - Security MisConfig
+                                            // Use generic cookie name
+                                            key: "sessionId",
+                                            */
 
-    // Register templating engine
-    app.engine(".html", consolidate.swig);
-    app.set("view engine", "html");
-    app.set("views", `${__dirname}/app/views`);
-    // Fix for A5 - Security MisConfig
-    // TODO: make sure assets are declared before app.use(session())
-    app.use(express.static(`${__dirname}/app/assets`));
+                                            // Fix for A3 - XSS
+                                            // Add maxAge for session expiration
+                                            cookie: {
+                                                httpOnly: true,
+                                                maxAge: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+                                                app.use(session({
+                                                        // genid: (req) => {
+                                                        //    return genuuid() // use UUIDs for session IDs
+                                                        //},
+                                                        secret: cookieSecret,
+                                                        // Both mandatory in Express v4
+                                                        saveUninitialized: true,
+                                                        resave: true,
+                                                        // Fix for A5 - Security MisConfig
+                                                        // Use generic cookie name
+                                                        name: "sessionId"
 
+                                                        /*
+                                                        // Fix for A3 - XSS
+                                                        // TODO: Add "maxAge"
+                                                        cookie: {
+                                                            httpOnly: true
+                                                            // Enable session management using express middleware
+                                                                app.use(session({
+                                                                    // genid: (req) => {
+                                                                    //    return genuuid() // use UUIDs for session IDs
+                                                                    //},
+                                                                    secret: cookieSecret,
+                                                                    // Both mandatory in Express v4
+                                                                    saveUninitialized: true,
+                                                                    resave: true,
+                                                                    /*
+                                                                    // Fix for A5 - Security MisConfig
+                                                                    // Use generic cookie name
+                                                                    key: "sessionId",
+                                                                    */
 
-    // Initializing marked library
-    // Fix for A9 - Insecure Dependencies
-    marked.setOptions({
-        sanitize: true
-    });
-    app.locals.marked = marked;
+                                                                    // Fix for A3 - XSS
+                                                                    // TODO: Add "maxAge"
+                                                                    cookie: {
+                                                                        httpOnly: true,
+                                                                        app.use(session({
+                                                                                // genid: (req) => {
+                                                                                //    return genuuid() // use UUIDs for session IDs
+                                                                                //},
+                                                                                secret: cookieSecret,
+                                                                                // Both mandatory in Express v4
+                                                                                saveUninitialized: true,
+                                                                                resave: true,
+                                                                                /*
+                                                                                // Fix for A5 - Security MisConfig
+                                                                                // Use generic cookie name
+                                                                                key: "sessionId",
+                                                                                */
 
-    // Application routes
-    routes(app, db);
+                                                                                // Fix for A3 - XSS
+                                                                                // TODO: Add "maxAge"
+                                                                                cookie: {
+                                                                                    httpOnly: true
+                                                                                    // Remember to start an HTTPS server to get this working
+                                                                                    // secure: true
+                                                                                }
 
-    // Template system setup
-    swig.setDefaults({
-        // Autoescape disabled
-        autoescape: false
-        /*
-        // Fix for A3 - XSS, enable auto escaping
-        autoescape: true // default value
-        */
-    });
-
-    // Insecure HTTP connection
-    http.createServer(app).listen(port, () => {
-        console.log(`Express http server listening on port ${port}`);
-    });
-
-    /*
-    // Fix for A6-Sensitive Data Exposure
-    // Use secure HTTPS protocol
-    https.createServer(httpsOptions, app).listen(port, () => {
-        console.log(`Express http server listening on port ${port}`);
-    });
-    */
-
-});
+                                                                            }));
