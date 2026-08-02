@@ -55,16 +55,17 @@
                                 {% csrf_token %}
                                 <div class="input-group">
                                     <input type="hidden" name="userId" value="{{user._id.toString()}}"></input>
-                                    <input type="date" class="form-control" name="benefitStartDate" value="{{user.benefitStartDate}}"></input>
-                                    <span class="input-group-btn">
-                                        <button type="submit" class="btn btn-default">Save</button>
-                                    </span>
-                                </div>
-                                <!-- /input-group -->
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
+                                    <form method="POST" action="/benefits">
+                                                                    {% csrf_token %}
+                                                                    <div class="input-group">
+                                                                        <input type="hidden" name="userId" value="{{user._id.toString()}}"></input>
+                                                                        <input type="date" class="form-control" name="benefitStartDate" value="{{user.benefitStartDate}}"></input>
+                                                                        <span class="input-group-btn">
+                                                                            <button type="submit" class="btn btn-default">Save</button>
+                                                                        </span>
+                                                                    </div>
+                                                                    <!-- /input-group -->
+                                                                </form>
                 </tbody>
             </table>
 
