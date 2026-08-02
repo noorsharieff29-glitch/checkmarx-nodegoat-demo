@@ -11,11 +11,19 @@ services:
       - "4000:4000"
 
   mongo:
-    image: mongo:4.4
-    user: mongodb
-    read_only: true
-    tmpfs:
-      - /tmp
+    mongo:
+        mongo:
+            image: mongo:4.4
+            user: mongodb
+            security_opt:
+              - no-new-privileges:true
+            expose:
+              - 27017
+          - /var/tmp
+        volumes:
+          - mongo_data:/data/db
+        expose:
+          - 27017
       - /var/tmp
     volumes:
       - mongo_data:/data/db
