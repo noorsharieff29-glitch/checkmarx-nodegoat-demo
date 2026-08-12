@@ -67,3 +67,4 @@ function ContributionsHandler(db) {
 }
 
 module.exports = ContributionsHandler;
+// touch to trigger Vorpal scan
