@@ -1,5 +1,5 @@
 name: KICS IaC Scan
-on: [push,pull_request]
+on: [pull_request]
 jobs:
   kics-job:
     runs-on: ubuntu-latest
