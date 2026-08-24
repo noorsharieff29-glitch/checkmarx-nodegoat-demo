@@ -14,19 +14,13 @@ jobs:
         with:
           path: '.'
           output_path: kics-results/
-          output_formats: 'json,sarif,html'
+          output_formats: 'json,sarif,pdf'
 
       - name: Show results
         run: cat kics-results/results.json
-
-      - name: Convert KICS HTML report to PDF
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wkhtmltopdf
-          wkhtmltopdf kics-results/results.html kics-results/kics-report.pdf
 
       - name: Upload KICS PDF Report
         uses: actions/upload-artifact@v4
         with:
           name: kics-pdf-report
-          path: kics-results/kics-report.pdf
+          path: kics-results/results.pdf
