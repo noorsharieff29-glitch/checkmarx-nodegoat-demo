@@ -1,5 +1,5 @@
 name: KICS IaC Scan
-on: [push,pull_request]
+on: [pull_request]
 jobs:
   kics-job:
     runs-on: ubuntu-latest
@@ -10,6 +10,6 @@ jobs:
         with:
           path: '.'
           output_path: kics-results/
-          output_formats: 'json,sarif'
+          output_formats: 'pdf'
       - name: Show results
         run: cat kics-results/results.json
