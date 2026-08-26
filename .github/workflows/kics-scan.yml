@@ -1,6 +1,6 @@
 name: KICS IaC Scan
 
-on: [pull_request]
+on: [push, pull_request]
 
 jobs:
   kics-job:
