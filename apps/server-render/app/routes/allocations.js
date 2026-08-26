@@ -3,7 +3,7 @@ const AllocationsDAO = require("../data/allocations-dao").AllocationsDAO;
 function AllocationsHandler(db) {
     "use strict";
 
-    const allocationsDAO = new AllocationsDAO(db);
+    const allocationsDAO = new AllocationsDAO(db); //comment
 
     this.displayAllocations = (req, res, next) => {
         /*
