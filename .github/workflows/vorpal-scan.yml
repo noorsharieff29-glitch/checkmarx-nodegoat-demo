@@ -1,5 +1,5 @@
 name: Vorpal Code Scan
-on: [pull_request]
+on: [push]
 jobs:
   vorpal:
     runs-on: ubuntu-latest
@@ -20,3 +20,80 @@ jobs:
           reporter: github-pr-check
           level: error
           fail_on_error: true
+      - name: Create Vorpal report
+        if: always()
+        run: |
+          mkdir -p reports
+
+          cat > reports/vorpal-report.html <<'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Vorpal Code Scan Report</title>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                margin: 40px;
+              }
+
+              h1 {
+                color: #222;
+              }
+
+              .info {
+                margin-bottom: 20px;
+              }
+
+              .status {
+                padding: 10px;
+                border: 1px solid #ccc;
+                margin-top: 20px;
+              }
+            </style>
+          </head>
+
+          <body>
+            <h1>Vorpal Code Scan Report</h1>
+
+            <div class="info">
+              <p><strong>Repository:</strong> ${{ github.repository }}</p>
+              <p><strong>Pull Request:</strong> #${{ github.event.pull_request.number }}</p>
+              <p><strong>Commit:</strong> ${{ github.sha }}</p>
+              <p><strong>Generated:</strong> ${{ github.run_id }}</p>
+            </div>
+
+            <div class="status">
+              <h2>Vorpal Scan</h2>
+              <p>
+                The Vorpal scan was executed using the Checkmarx
+                Vorpal Reviewdog GitHub Action.
+              </p>
+              <p>
+                Findings are reported directly on the GitHub Pull Request.
+              </p>
+            </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Install wkhtmltopdf
+        if: always()
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wkhtmltopdf
+
+      - name: Convert Vorpal report to PDF
+        if: always()
+        run: |
+          wkhtmltopdf \
+            reports/vorpal-report.html \
+            reports/vorpal-code-scan-report.pdf
+
+      - name: Upload Vorpal PDF report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vorpal-code-scan-report
+          path: reports/vorpal-code-scan-report.pdf
+          retention-days: 30
