@@ -135,4 +135,3 @@ jobs:
           name: vorpal-code-scan-report
           path: reports/vorpal-code-scan-report.pdf
           retention-days: 30
-```
