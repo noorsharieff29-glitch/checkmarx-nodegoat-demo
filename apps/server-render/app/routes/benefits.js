@@ -1,6 +1,6 @@
 const {
     BenefitsDAO
-} = require("../data/benefits-dao");
+} = require("../data/benefits-dao"); //comment
 
 function BenefitsHandler(db) {
     "use strict";
