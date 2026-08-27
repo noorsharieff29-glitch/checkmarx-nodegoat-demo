@@ -1,11 +1,11 @@
 # KICS IaC Scan — PDF Artifact
+
 name: KICS IaC Scan
 
 on: [push]
-  
 
 jobs:
-  kics-job:
+  kics:
     runs-on: ubuntu-latest
 
     steps:
@@ -13,50 +13,51 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run KICS Scan
-        uses: checkmarx/kics-github-action@v2.1.20
-        with:
-          path: '.'
-          output_path: 'kics-results/'
-          output_formats: 'json,sarif,html,pdf'
-          output_name: 'kics-report'
-          ignore_on_exit: results
+      - name: Create KICS reports directory
+        run: |
+          mkdir -p kics-results
 
-      - name: Show generated KICS reports
+      - name: Run KICS scan
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/path" \
+            checkmarx/kics:latest \
+            scan \
+            -p /path \
+            -o /path/kics-results \
+            --report-formats "json,sarif,html,pdf" \
+            --output-name kics-report
+
+      - name: Show KICS reports
         if: always()
         run: |
-          echo "===================================="
-          echo "KICS reports generated:"
-          echo "===================================="
+          echo "======================================"
+          echo "KICS REPORTS"
+          echo "======================================"
 
-          ls -lah kics-results/
-
-          echo ""
-          echo "PDF files:"
-          find kics-results -type f -name "*.pdf" -print
+          find kics-results -type f -maxdepth 2 -print
 
           echo ""
-          echo "JSON files:"
-          find kics-results -type f -name "*.json" -print
+          echo "======================================"
+          echo "PDF FILES"
+          echo "======================================"
 
-          echo ""
-          echo "HTML files:"
-          find kics-results -type f -name "*.html" -print
+          find kics-results -type f -name "*.pdf" -exec ls -lh {} \;
 
-      - name: Verify PDF exists
+      - name: Verify PDF
         if: always()
         run: |
           if [ -f "kics-results/kics-report.pdf" ]; then
-            echo "KICS PDF found successfully."
+            echo "SUCCESS: KICS PDF generated."
             ls -lh kics-results/kics-report.pdf
           else
             echo "ERROR: KICS PDF was not generated."
-            echo "Files actually generated:"
-            find kics-results -type f -print
+            echo "Files found:"
+            find kics-results -type f
             exit 1
           fi
 
-      - name: Upload KICS PDF Report
+      - name: Upload KICS PDF
         if: always()
         uses: actions/upload-artifact@v4
         with:
