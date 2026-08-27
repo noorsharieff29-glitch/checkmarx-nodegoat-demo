@@ -4,7 +4,7 @@ const ContributionsDAO = require("../data/contributions-dao").ContributionsDAO;
 function ContributionsHandler(db) {
     "use strict";
 
-    const contributionsDAO = new ContributionsDAO(db); //comments
+    const contributionsDAO = new ContributionsDAO(db); //comment here
 
     this.displayContributions = (req, res, next) => {
         const {
