@@ -1,30 +1,65 @@
+# KICS IaC Scan — PDF Artifact
 name: KICS IaC Scan
 
-on: [push, pull_request]
+on: [push]
+  
 
 jobs:
   kics-job:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Run KICS Scan
         uses: checkmarx/kics-github-action@v2.1.20
         with:
           path: '.'
-          output_path: kics-results/
-          output_formats: 'json,sarif,pdf'
-         
+          output_path: 'kics-results/'
+          output_formats: 'json,sarif,html,pdf'
+          output_name: 'kics-report'
+          ignore_on_exit: results
 
-      - name: Show results
+      - name: Show generated KICS reports
+        if: always()
         run: |
+          echo "===================================="
           echo "KICS reports generated:"
+          echo "===================================="
+
           ls -lah kics-results/
-          cat kics-results/results.json
+
+          echo ""
+          echo "PDF files:"
+          find kics-results -type f -name "*.pdf" -print
+
+          echo ""
+          echo "JSON files:"
+          find kics-results -type f -name "*.json" -print
+
+          echo ""
+          echo "HTML files:"
+          find kics-results -type f -name "*.html" -print
+
+      - name: Verify PDF exists
+        if: always()
+        run: |
+          if [ -f "kics-results/kics-report.pdf" ]; then
+            echo "KICS PDF found successfully."
+            ls -lh kics-results/kics-report.pdf
+          else
+            echo "ERROR: KICS PDF was not generated."
+            echo "Files actually generated:"
+            find kics-results -type f -print
+            exit 1
+          fi
 
       - name: Upload KICS PDF Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: kics-pdf-report
-          path: kics-results/results.pdf
+          path: kics-results/kics-report.pdf
+          retention-days: 30
