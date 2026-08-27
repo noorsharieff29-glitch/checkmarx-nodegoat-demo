@@ -1,5 +1,5 @@
 name: Vorpal Code Scan
-on: [push]
+on: [push,pull_request]
 jobs:
   vorpal:
     runs-on: ubuntu-latest
