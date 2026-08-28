@@ -48,10 +48,6 @@ jobs:
         run: |
 
           cat > reports/vorpal-report.txt <<EOF
-============================================================
-                 VORPAL SECURITY SCAN
-============================================================
-
 Repository : ${{ github.repository }}
 Branch     : ${{ github.ref_name }}
 Commit     : ${{ github.sha }}
