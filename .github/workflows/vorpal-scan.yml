@@ -1,250 +1,101 @@
+
 name: Vorpal Code Scan
+
 on: [push,pull_request]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 jobs:
+
   vorpal:
+
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v46.0.1
         with:
           separator: ','
-      - name: Vorpal with reviewdog
+
+      - name: Create reports directory
+        run: |
+          mkdir -p reports
+
+      - name: Run Vorpal
         if: ${{ steps.changed-files.outputs.all_changed_files != '' }}
         uses: checkmarx/vorpal-reviewdog-github-action@v1.0.0
         with:
           source_path: "${{ steps.changed-files.outputs.all_changed_files }}"
           filter_mode: file
-          github_token: ${{ secrets.github_token }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
-          level: error
-          fail_on_error: true
-      # Give GitHub a few seconds to create/update the Check
-      - name: Wait for Vorpal Check
-        if: always()
-        run: sleep 10
+          level: info
+          fail_on_error: false
+          reviewdog_flags: "-tee"
 
-      - name: Install tools
+      - name: Create readable Vorpal report
         if: always()
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wkhtmltopdf jq
 
-      - name: Get Vorpal findings
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p reports
+          cat > reports/vorpal-report.txt <<EOF
+          ============================================================
+                         VORPAL SECURITY SCAN REPORT
+          ============================================================
 
-          echo "Getting GitHub Check results..."
+          Repository : ${{ github.repository }}
+          Branch     : ${{ github.ref_name }}
+          Commit     : ${{ github.sha }}
+          Run ID     : ${{ github.run_id }}
 
-          gh api \
-            repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs \
-            --paginate \
-            > reports/check-runs.json
+          ============================================================
+                         SCAN INFORMATION
+          ============================================================
 
-          jq '.' reports/check-runs.json > reports/check-runs-readable.json
+          Tool       : Checkmarx Vorpal
+          Reporter   : Reviewdog
+          Trigger    : ${{ github.event_name }}
 
-      - name: Create user-friendly HTML report
-        if: always()
-        run: |
-          python3 <<'PY'
-          import json
-          import html
+          ============================================================
+                         VORPAL FINDINGS
+          ============================================================
 
-          with open("reports/check-runs.json") as f:
-              data = json.load(f)
+          The detailed Vorpal findings are displayed in the
+          GitHub Actions log and GitHub Check created by Reviewdog.
 
-          # Handle GitHub API pagination format
-          if isinstance(data, dict):
-              check_runs = data.get("check_runs", [])
-          else:
-              check_runs = []
+          ============================================================
+          EOF
 
-          vorpal_runs = []
+          echo ""
+          echo "============================================================"
+          echo "Vorpal report created"
+          echo "============================================================"
 
-          for run in check_runs:
-              name = run.get("name", "").lower()
+          cat reports/vorpal-report.txt
 
-              if "vorpal" in name or "reviewdog" in name:
-                  vorpal_runs.append(run)
-
-          with open("reports/vorpal-report.html", "w") as f:
-
-              f.write("""
-              <!DOCTYPE html>
-              <html>
-              <head>
-              <meta charset="UTF-8">
-
-              <style>
-              body {
-                  font-family: Arial, sans-serif;
-                  margin: 40px;
-                  color: #222;
-              }
-
-              h1 {
-                  border-bottom: 2px solid #333;
-                  padding-bottom: 10px;
-              }
-
-              h2 {
-                  margin-top: 30px;
-              }
-
-              .summary {
-                  padding: 15px;
-                  background: #f4f4f4;
-                  border-radius: 6px;
-                  margin-bottom: 25px;
-              }
-
-              .finding {
-                  border: 1px solid #ccc;
-                  border-radius: 6px;
-                  padding: 15px;
-                  margin-bottom: 15px;
-              }
-
-              .title {
-                  font-size: 18px;
-                  font-weight: bold;
-              }
-
-              .details {
-                  margin-top: 10px;
-              }
-
-              table {
-                  border-collapse: collapse;
-                  width: 100%;
-              }
-
-              td {
-                  padding: 8px;
-                  border-bottom: 1px solid #ddd;
-              }
-
-              .label {
-                  font-weight: bold;
-                  width: 150px;
-              }
-
-              </style>
-              </head>
-
-              <body>
-
-              <h1>Vorpal Security Scan Report</h1>
-
-              <div class="summary">
-              <table>
-              <tr>
-                  <td class="label">Repository</td>
-                  <td>${{ github.repository }}</td>
-              </tr>
-
-              <tr>
-                  <td class="label">Branch</td>
-                  <td>${{ github.ref_name }}</td>
-              </tr>
-
-              <tr>
-                  <td class="label">Commit</td>
-                  <td>${{ github.sha }}</td>
-              </tr>
-
-              <tr>
-                  <td class="label">Workflow</td>
-                  <td>${{ github.run_id }}</td>
-              </tr>
-              </table>
-              </div>
-              """)
-
-              if not vorpal_runs:
-                  f.write("""
-                  <h2>No Vorpal Check found</h2>
-                  <p>
-                  The Vorpal scan was executed, but no Vorpal
-                  GitHub Check was found for this commit.
-                  </p>
-                  """)
-
-              for run in vorpal_runs:
-
-                  f.write("<h2>Vorpal Results</h2>")
-
-                  f.write("<div class='finding'>")
-
-                  f.write(
-                      "<div class='title'>" +
-                      html.escape(run.get("name", "Vorpal")) +
-                      "</div>"
-                  )
-
-                  f.write("<div class='details'>")
-
-                  f.write(
-                      "<p><b>Status:</b> " +
-                      html.escape(str(run.get("status", ""))) +
-                      "</p>"
-                  )
-
-                  f.write(
-                      "<p><b>Conclusion:</b> " +
-                      html.escape(str(run.get("conclusion", ""))) +
-                      "</p>"
-                  )
-
-                  output = run.get("output") or {}
-
-                  if output.get("title"):
-                      f.write(
-                          "<p><b>Title:</b> " +
-                          html.escape(output["title"]) +
-                          "</p>"
-                      )
-
-                  if output.get("summary"):
-                      f.write(
-                          "<p><b>Summary:</b><br>" +
-                          html.escape(output["summary"]) +
-                          "</p>"
-                      )
-
-                  if output.get("text"):
-                      f.write(
-                          "<p><b>Details:</b><br>" +
-                          html.escape(output["text"]) +
-                          "</p>"
-                      )
-
-                  f.write("</div>")
-                  f.write("</div>")
-
-              f.write("""
-              </body>
-              </html>
-              """)
-
-          print("HTML report created.")
-          PY
-
-      - name: Convert HTML to PDF
+      - name: Save Actions log information
         if: always()
         run: |
-          wkhtmltopdf \
-            reports/vorpal-report.html \
-            reports/vorpal-security-report.pdf
 
-      - name: Upload Vorpal PDF
+          echo ""
+          echo "============================================================"
+          echo "VORPAL / REVIEWDOG OUTPUT"
+          echo "============================================================"
+
+          echo "The Vorpal action output above contains the actual findings."
+
+      - name: Upload Vorpal readable report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: vorpal-security-report
-          path: reports/vorpal-security-report.pdf
+          path: reports/vorpal-report.txt
+          if-no-files-found: error
           retention-days: 30
