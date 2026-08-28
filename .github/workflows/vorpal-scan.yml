@@ -2,7 +2,7 @@
 name: Vorpal Code Scan
 
 on: [push,pull_request]
-
+  
 permissions:
   contents: read
   checks: write
@@ -16,76 +16,83 @@ jobs:
 
     steps:
 
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@v46.0.1
-        with:
-          separator: ','
-
-      - name: Show files being scanned
-        if: always()
+      - name: Show repository files
         run: |
           echo "=========================================="
-          echo "FILES BEING SCANNED BY VORPAL"
+          echo "FILES IN REPOSITORY"
           echo "=========================================="
 
-          echo "${{ steps.changed-files.outputs.all_changed_files }}"
+          find . -type f \
+            ! -path './.git/*' \
+            | head -200
+
+      - name: Create reports directory
+        run: |
+          mkdir -p reports
 
       - name: Run Vorpal
-        if: ${{ steps.changed-files.outputs.all_changed_files != '' }}
         uses: checkmarx/vorpal-reviewdog-github-action@v1.0.0
         with:
-          source_path: "${{ steps.changed-files.outputs.all_changed_files }}"
+          source_path: "."
           filter_mode: nofilter
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
           level: info
           fail_on_error: false
 
-      - name: Create scan information
+      - name: Create scan report
         if: always()
         run: |
 
-          mkdir -p reports
+          cat > reports/vorpal-report.txt <<EOF
+============================================================
+                 VORPAL SECURITY SCAN
+============================================================
 
-          cat > reports/vorpal-summary.txt <<EOF
-          ============================================================
-                         VORPAL SECURITY SCAN
-          ============================================================
+Repository : ${{ github.repository }}
+Branch     : ${{ github.ref_name }}
+Commit     : ${{ github.sha }}
+Event      : ${{ github.event_name }}
+Run ID     : ${{ github.run_id }}
 
-          Repository : ${{ github.repository }}
-          Branch     : ${{ github.ref_name }}
-          Commit     : ${{ github.sha }}
-          Event      : ${{ github.event_name }}
-          Run ID     : ${{ github.run_id }}
+============================================================
+                 SCAN CONFIGURATION
+============================================================
 
-          ============================================================
-                         FILES SCANNED
-          ============================================================
+Scanner       : Checkmarx Vorpal
+Source        : Entire repository
+Filter Mode   : nofilter
+Severity      : info
 
-          ${{ steps.changed-files.outputs.all_changed_files }}
+============================================================
+                 IMPORTANT
+============================================================
 
-          ============================================================
-                         RESULT
-          ============================================================
+Vorpal findings are reported by Reviewdog to the
+GitHub Check associated with this workflow.
 
-          The complete Vorpal/Reviewdog output is available in the
-          GitHub Actions workflow log.
+Open:
 
-          The GitHub Check created by Reviewdog contains the
-          security findings.
+GitHub
+  -> Actions
+  -> Vorpal Code Scan
+  -> This workflow run
+  -> Checks
+  -> Vorpal
 
-          ============================================================
-          EOF
+============================================================
+EOF
 
-      - name: Upload Vorpal summary
+          echo "Report created."
+
+      - name: Upload Vorpal report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: vorpal-security-report
-          path: reports/vorpal-summary.txt
+          path: reports/vorpal-report.txt
           if-no-files-found: error
           retention-days: 30
