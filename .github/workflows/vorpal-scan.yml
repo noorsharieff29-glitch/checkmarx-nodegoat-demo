@@ -25,77 +25,67 @@ jobs:
         with:
           separator: ','
 
-      - name: Create reports directory
+      - name: Show files being scanned
+        if: always()
         run: |
-          mkdir -p reports
+          echo "=========================================="
+          echo "FILES BEING SCANNED BY VORPAL"
+          echo "=========================================="
+
+          echo "${{ steps.changed-files.outputs.all_changed_files }}"
 
       - name: Run Vorpal
         if: ${{ steps.changed-files.outputs.all_changed_files != '' }}
         uses: checkmarx/vorpal-reviewdog-github-action@v1.0.0
         with:
           source_path: "${{ steps.changed-files.outputs.all_changed_files }}"
-          filter_mode: file
+          filter_mode: nofilter
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
           level: info
           fail_on_error: false
-          reviewdog_flags: "-tee"
 
-      - name: Create readable Vorpal report
+      - name: Create scan information
         if: always()
         run: |
 
-          cat > reports/vorpal-report.txt <<EOF
+          mkdir -p reports
+
+          cat > reports/vorpal-summary.txt <<EOF
           ============================================================
-                         VORPAL SECURITY SCAN REPORT
+                         VORPAL SECURITY SCAN
           ============================================================
 
           Repository : ${{ github.repository }}
           Branch     : ${{ github.ref_name }}
           Commit     : ${{ github.sha }}
+          Event      : ${{ github.event_name }}
           Run ID     : ${{ github.run_id }}
 
           ============================================================
-                         SCAN INFORMATION
+                         FILES SCANNED
           ============================================================
 
-          Tool       : Checkmarx Vorpal
-          Reporter   : Reviewdog
-          Trigger    : ${{ github.event_name }}
+          ${{ steps.changed-files.outputs.all_changed_files }}
 
           ============================================================
-                         VORPAL FINDINGS
+                         RESULT
           ============================================================
 
-          The detailed Vorpal findings are displayed in the
-          GitHub Actions log and GitHub Check created by Reviewdog.
+          The complete Vorpal/Reviewdog output is available in the
+          GitHub Actions workflow log.
+
+          The GitHub Check created by Reviewdog contains the
+          security findings.
 
           ============================================================
           EOF
 
-          echo ""
-          echo "============================================================"
-          echo "Vorpal report created"
-          echo "============================================================"
-
-          cat reports/vorpal-report.txt
-
-      - name: Save Actions log information
-        if: always()
-        run: |
-
-          echo ""
-          echo "============================================================"
-          echo "VORPAL / REVIEWDOG OUTPUT"
-          echo "============================================================"
-
-          echo "The Vorpal action output above contains the actual findings."
-
-      - name: Upload Vorpal readable report
+      - name: Upload Vorpal summary
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: vorpal-security-report
-          path: reports/vorpal-report.txt
+          path: reports/vorpal-summary.txt
           if-no-files-found: error
           retention-days: 30
