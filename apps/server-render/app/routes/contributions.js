@@ -2,7 +2,7 @@ const ContributionsDAO = require("../data/contributions-dao").ContributionsDAO;
 
 /* The ContributionsHandler must be constructed with a connected db */
 function ContributionsHandler(db) {
-    "use strict";
+    "use strict"; // comments
 
     const contributionsDAO = new ContributionsDAO(db); //comments
 
