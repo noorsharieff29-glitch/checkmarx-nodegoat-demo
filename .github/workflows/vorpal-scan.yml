@@ -1,11 +1,11 @@
 name: Vorpal Code Scan
 
-on: [push, pull_request]
+on: [push,pull_request]
 
 permissions:
   contents: read
-  checks: read
-  pull-requests: read
+  checks: write
+  pull-requests: write
 
 jobs:
   vorpal:
@@ -16,51 +16,60 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Find JavaScript files
+        id: files
+        run: |
+          FILES=$(find . -type f \( -name "*.js" -o -name "*.jsx" \) \
+            ! -path "./.git/*" \
+            | paste -sd "," -)
+
+          echo "JavaScript files:"
+          echo "$FILES"
+
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+
       - name: Run Vorpal
+        if: steps.files.outputs.files != ''
         uses: checkmarx/vorpal-reviewdog-github-action@v1.0.0
         with:
-          source_path: "."
+          source_path: "${{ steps.files.outputs.files }}"
           filter_mode: nofilter
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
           level: info
           fail_on_error: false
 
-      - name: Wait for Check
-        run: sleep 10
-
-      - name: Get Vorpal Check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create readable scan log
+        if: always()
         run: |
-
           mkdir -p reports
 
-          gh api \
-            "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs" \
-            --jq '.check_runs[] |
-            select(.name | test("Vorpal|reviewdog"; "i")) |
-            {
-              name: .name,
-              status: .status,
-              conclusion: .conclusion,
-              title: .output.title,
-              summary: .output.summary,
-              text: .output.text
-            }' \
-            > reports/vorpal-report.txt
+          echo "========================================" > reports/vorpal-report.txt
+          echo "       VORPAL SECURITY SCAN" >> reports/vorpal-report.txt
+          echo "========================================" >> reports/vorpal-report.txt
+          echo "" >> reports/vorpal-report.txt
 
-          echo "=============================="
-          echo "VORPAL REPORT"
-          echo "=============================="
+          echo "Repository: ${{ github.repository }}" >> reports/vorpal-report.txt
+          echo "Branch: ${{ github.ref_name }}" >> reports/vorpal-report.txt
+          echo "Commit: ${{ github.sha }}" >> reports/vorpal-report.txt
+          echo "" >> reports/vorpal-report.txt
 
-          cat reports/vorpal-report.txt
+          echo "Files scanned:" >> reports/vorpal-report.txt
+          echo "${{ steps.files.outputs.files }}" >> reports/vorpal-report.txt
+          echo "" >> reports/vorpal-report.txt
 
-      - name: Upload Vorpal Report
+          echo "========================================" >> reports/vorpal-report.txt
+          echo "RESULT" >> reports/vorpal-report.txt
+          echo "========================================" >> reports/vorpal-report.txt
+          echo "" >> reports/vorpal-report.txt
+
+          echo "Vorpal findings are reported in the GitHub Check." >> reports/vorpal-report.txt
+          echo "Open the Checks tab for the detailed findings." >> reports/vorpal-report.txt
+
+      - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: vorpal-report
           path: reports/vorpal-report.txt
           if-no-files-found: error
-          retention-days: 30
