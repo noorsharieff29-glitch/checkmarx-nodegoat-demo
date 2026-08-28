@@ -54,35 +54,12 @@ Commit     : ${{ github.sha }}
 Event      : ${{ github.event_name }}
 Run ID     : ${{ github.run_id }}
 
-============================================================
-                 SCAN CONFIGURATION
-============================================================
 
 Scanner       : Checkmarx Vorpal
 Source        : Entire repository
 Filter Mode   : nofilter
 Severity      : info
 
-============================================================
-                 IMPORTANT
-============================================================
-
-Vorpal findings are reported by Reviewdog to the
-GitHub Check associated with this workflow.
-
-Open:
-
-GitHub
-  -> Actions
-  -> Vorpal Code Scan
-  -> This workflow run
-  -> Checks
-  -> Vorpal
-
-============================================================
-EOF
-
-          echo "Report created."
 
       - name: Upload Vorpal report
         if: always()
