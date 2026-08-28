@@ -1,37 +1,16 @@
 
 name: Vorpal Code Scan
 
-on: [push,pull_request]
-  
-permissions:
-  contents: read
-  checks: write
-  pull-requests: write
+on: [push, pull_request]
 
 jobs:
-
   vorpal:
-
     runs-on: ubuntu-latest
 
     steps:
 
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Show repository files
-        run: |
-          echo "=========================================="
-          echo "FILES IN REPOSITORY"
-          echo "=========================================="
-
-          find . -type f \
-            ! -path './.git/*' \
-            | head -200
-
-      - name: Create reports directory
-        run: |
-          mkdir -p reports
 
       - name: Run Vorpal
         uses: checkmarx/vorpal-reviewdog-github-action@v1.0.0
@@ -43,29 +22,36 @@ jobs:
           level: info
           fail_on_error: false
 
-      - name: Create scan report
+      - name: Create readable report
         if: always()
         run: |
+          mkdir -p reports
 
-          cat > reports/vorpal-report.txt <<EOF
-Repository : ${{ github.repository }}
-Branch     : ${{ github.ref_name }}
-Commit     : ${{ github.sha }}
-Event      : ${{ github.event_name }}
-Run ID     : ${{ github.run_id }}
+          echo "========================================" > reports/vorpal-report.txt
+          echo "       VORPAL SECURITY SCAN REPORT" >> reports/vorpal-report.txt
+          echo "========================================" >> reports/vorpal-report.txt
+          echo "" >> reports/vorpal-report.txt
 
+          echo "Repository: ${{ github.repository }}" >> reports/vorpal-report.txt
+          echo "Branch: ${{ github.ref_name }}" >> reports/vorpal-report.txt
+          echo "Commit: ${{ github.sha }}" >> reports/vorpal-report.txt
+          echo "" >> reports/vorpal-report.txt
 
-Scanner       : Checkmarx Vorpal
-Source        : Entire repository
-Filter Mode   : nofilter
-Severity      : info
+          echo "========================================" >> reports/vorpal-report.txt
+          echo "       VORPAL SCAN RESULT" >> reports/vorpal-report.txt
+          echo "========================================" >> reports/vorpal-report.txt
+          echo "" >> reports/vorpal-report.txt
 
+          echo "Vorpal scan completed." >> reports/vorpal-report.txt
+          echo "" >> reports/vorpal-report.txt
+          echo "Detailed findings are available in:" >> reports/vorpal-report.txt
+          echo "GitHub -> Checks -> Vorpal" >> reports/vorpal-report.txt
 
-      - name: Upload Vorpal report
+          cat reports/vorpal-report.txt
+
+      - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vorpal-security-report
+          name: vorpal-report
           path: reports/vorpal-report.txt
-          if-no-files-found: error
-          retention-days: 30
