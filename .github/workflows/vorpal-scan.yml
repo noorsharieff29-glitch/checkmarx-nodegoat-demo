@@ -1,11 +1,11 @@
 name: Vorpal Code Scan
 
-on: [push,pull_request]
+on: [push, pull_request]
 
 permissions:
   contents: read
-  checks: write
-  pull-requests: write
+  checks: read
+  pull-requests: read
 
 jobs:
   vorpal:
@@ -16,60 +16,354 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Find JavaScript files
-        id: files
-        run: |
-          FILES=$(find . -type f \( -name "*.js" -o -name "*.jsx" \) \
-            ! -path "./.git/*" \
-            | paste -sd "," -)
-
-          echo "JavaScript files:"
-          echo "$FILES"
-
-          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v46.0.1
+        with:
+          separator: ','
 
       - name: Run Vorpal
-        if: steps.files.outputs.files != ''
+        if: ${{ steps.changed-files.outputs.all_changed_files != '' }}
         uses: checkmarx/vorpal-reviewdog-github-action@v1.0.0
         with:
-          source_path: "${{ steps.files.outputs.files }}"
-          filter_mode: nofilter
+          source_path: "${{ steps.changed-files.outputs.all_changed_files }}"
+          filter_mode: file
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
-          level: info
+          level: error
           fail_on_error: false
 
-      - name: Create readable scan log
+      - name: Wait for GitHub Check
         if: always()
+        run: sleep 10
+
+      - name: Get Vorpal Check
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+
           mkdir -p reports
 
-          echo "========================================" > reports/vorpal-report.txt
-          echo "       VORPAL SECURITY SCAN" >> reports/vorpal-report.txt
-          echo "========================================" >> reports/vorpal-report.txt
-          echo "" >> reports/vorpal-report.txt
+          echo "Finding Vorpal Check..."
 
-          echo "Repository: ${{ github.repository }}" >> reports/vorpal-report.txt
-          echo "Branch: ${{ github.ref_name }}" >> reports/vorpal-report.txt
-          echo "Commit: ${{ github.sha }}" >> reports/vorpal-report.txt
-          echo "" >> reports/vorpal-report.txt
+          gh api \
+            "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs" \
+            --paginate \
+            --jq '.check_runs[] |
+              select(.name | test("Vorpal"; "i")) |
+              {
+                id: .id,
+                name: .name,
+                status: .status,
+                conclusion: .conclusion,
+                output: .output
+              }' \
+            > reports/vorpal-check.json
 
-          echo "Files scanned:" >> reports/vorpal-report.txt
-          echo "${{ steps.files.outputs.files }}" >> reports/vorpal-report.txt
-          echo "" >> reports/vorpal-report.txt
+          echo "Vorpal Check:"
+          cat reports/vorpal-check.json
 
-          echo "========================================" >> reports/vorpal-report.txt
-          echo "RESULT" >> reports/vorpal-report.txt
-          echo "========================================" >> reports/vorpal-report.txt
-          echo "" >> reports/vorpal-report.txt
+      - name: Get Vorpal annotations
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
 
-          echo "Vorpal findings are reported in the GitHub Check." >> reports/vorpal-report.txt
-          echo "Open the Checks tab for the detailed findings." >> reports/vorpal-report.txt
+          CHECK_ID=$(jq -r '.id' reports/vorpal-check.json | head -1)
 
-      - name: Upload report
+          echo "Check ID: $CHECK_ID"
+
+          if [ "$CHECK_ID" != "null" ] && [ -n "$CHECK_ID" ]; then
+
+            gh api \
+              "repos/${{ github.repository }}/check-runs/${CHECK_ID}/annotations" \
+              --paginate \
+              > reports/vorpal-annotations.json
+
+          else
+
+            echo "[]" > reports/vorpal-annotations.json
+
+          fi
+
+          echo "Annotations:"
+          cat reports/vorpal-annotations.json
+
+      - name: Create readable report
+        if: always()
+        run: |
+
+          python3 <<'PY'
+
+          import json
+          import html
+
+          check_file = "reports/vorpal-check.json"
+          annotation_file = "reports/vorpal-annotations.json"
+          output_file = "reports/vorpal-report.html"
+
+          try:
+              with open(check_file) as f:
+                  check_data = json.load(f)
+          except:
+              check_data = {}
+
+          try:
+              with open(annotation_file) as f:
+                  annotations = json.load(f)
+          except:
+              annotations = []
+
+          if isinstance(annotations, dict):
+              annotations = annotations.get("annotations", [])
+
+          with open(output_file, "w", encoding="utf-8") as f:
+
+              f.write("""
+              <!DOCTYPE html>
+              <html>
+              <head>
+              <meta charset="UTF-8">
+
+              <title>Vorpal Security Report</title>
+
+              <style>
+
+              body {
+                  font-family: Arial, sans-serif;
+                  margin: 40px;
+                  background: #f5f5f5;
+                  color: #222;
+              }
+
+              .container {
+                  max-width: 1100px;
+                  margin: auto;
+                  background: white;
+                  padding: 30px;
+              }
+
+              h1 {
+                  border-bottom: 3px solid #333;
+                  padding-bottom: 10px;
+              }
+
+              .summary {
+                  background: #f1f1f1;
+                  padding: 20px;
+                  margin-bottom: 30px;
+              }
+
+              .finding {
+                  border: 1px solid #ccc;
+                  padding: 20px;
+                  margin-bottom: 20px;
+                  border-radius: 6px;
+              }
+
+              .finding-title {
+                  font-size: 20px;
+                  font-weight: bold;
+                  margin-bottom: 15px;
+              }
+
+              table {
+                  width: 100%;
+                  border-collapse: collapse;
+              }
+
+              td {
+                  padding: 10px;
+                  border-bottom: 1px solid #ddd;
+                  vertical-align: top;
+              }
+
+              td:first-child {
+                  width: 160px;
+                  font-weight: bold;
+              }
+
+              .none {
+                  padding: 20px;
+                  background: #eee;
+              }
+
+              </style>
+              </head>
+
+              <body>
+
+              <div class="container">
+
+              <h1>Vorpal Security Scan Report</h1>
+
+              <div class="summary">
+
+              <table>
+
+              <tr>
+              <td>Repository</td>
+              <td>""" + html.escape(
+                  "${{ github.repository }}"
+              ) + """</td>
+              </tr>
+
+              <tr>
+              <td>Branch</td>
+              <td>""" + html.escape(
+                  "${{ github.ref_name }}"
+              ) + """</td>
+              </tr>
+
+              <tr>
+              <td>Commit</td>
+              <td>""" + html.escape(
+                  "${{ github.sha }}"
+              ) + """</td>
+              </tr>
+
+              <tr>
+              <td>Total Findings</td>
+              <td><strong>""" + str(
+                  len(annotations)
+              ) + """</strong></td>
+              </tr>
+
+              </table>
+
+              </div>
+
+              <h2>Security Findings</h2>
+              """)
+
+              if not annotations:
+
+                  f.write("""
+                  <div class="none">
+
+                  <h3>No Vorpal annotations were returned</h3>
+
+                  <p>
+                  Vorpal completed, but GitHub did not return
+                  any file-level annotations for this Check.
+                  </p>
+
+                  </div>
+                  """)
+
+              else:
+
+                  for i, finding in enumerate(
+                      annotations,
+                      1
+                  ):
+
+                      path = finding.get(
+                          "path",
+                          "Unknown"
+                      )
+
+                      start_line = finding.get(
+                          "start_line",
+                          "N/A"
+                      )
+
+                      end_line = finding.get(
+                          "end_line",
+                          start_line
+                      )
+
+                      level = finding.get(
+                          "annotation_level",
+                          "N/A"
+                      )
+
+                      title = finding.get(
+                          "title",
+                          "Vorpal Finding"
+                      )
+
+                      message = finding.get(
+                          "message",
+                          "No description provided"
+                      )
+
+                      f.write(
+                          "<div class='finding'>"
+                      )
+
+                      f.write(
+                          "<div class='finding-title'>"
+                          "Finding "
+                          + str(i)
+                          + ": "
+                          + html.escape(
+                              str(title)
+                          )
+                          + "</div>"
+                      )
+
+                      f.write("<table>")
+
+                      rows = [
+
+                          ("Severity", level),
+
+                          ("File", path),
+
+                          ("Line", start_line),
+
+                          ("End Line", end_line),
+
+                          ("Description", message)
+
+                      ]
+
+                      for label, value in rows:
+
+                          f.write(
+                              "<tr>"
+                              "<td>"
+                              + html.escape(
+                                  str(label)
+                              )
+                              + "</td>"
+                              "<td>"
+                              + html.escape(
+                                  str(value)
+                              )
+                              + "</td>"
+                              "</tr>"
+                          )
+
+                      f.write("</table>")
+                      f.write("</div>")
+
+              f.write("""
+              </div>
+
+              </body>
+              </html>
+              """)
+
+          print(
+              "Created:",
+              output_file
+          )
+
+          print(
+              "Total annotations:",
+              len(annotations)
+          )
+
+          PY
+
+      - name: Upload readable Vorpal report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vorpal-report
-          path: reports/vorpal-report.txt
+          name: vorpal-security-report
+          path: reports/vorpal-report.html
           if-no-files-found: error
+          retention-days: 30
